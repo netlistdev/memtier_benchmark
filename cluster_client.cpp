@@ -104,6 +104,7 @@ static inline uint16_t crc16(const char *buf, size_t len) {
  * Instead assign the keys linearly to slots. */
 static inline uint16_t hash(const char *buf, size_t len) {
     const uint32_t keys_per_slot = 346; // Need to adjust for configuration.
+    const uint32_t divider = 12*273; // Need to adjust for configuration.
     if ((len >= 5) && (buf[0] == 's') && (buf[1] == 'l') &&
         (buf[2] == 'o') && (buf[3] == 't') && (buf[4] == '-')) {
         uint32_t key = 0;
@@ -113,6 +114,18 @@ static inline uint16_t hash(const char *buf, size_t len) {
             }
         }
         return uint16_t(key / keys_per_slot);
+
+    } else if ((len >= 5) && (buf[0] == 'd') && (buf[1] == 'i') &&
+        (buf[2] == 'v') && (buf[3] == 'i') && (buf[4] == '-')) {
+        uint32_t key = 0;
+        for (size_t counter = 5; counter < len; counter++) {
+            if ((buf[counter] >= '0') && (buf[counter] <= '9')) {
+                key = (key * 10) + (buf[counter] - '0');
+            }
+        }
+        if (key < divider*keys_per_slot) return crc16(buf, len) % divider;
+        else return divider + crc16(buf, len) % (16384 - divider);
+
     } else {
         return crc16(buf, len);
     }
