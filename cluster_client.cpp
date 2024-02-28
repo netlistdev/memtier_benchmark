@@ -100,10 +100,49 @@ static inline uint16_t crc16(const char *buf, size_t len) {
     return crc;
 }
 
-static uint32_t calc_hslot_crc16_cluster(const char *str, size_t length)
-{
-    uint32_t rv = (uint32_t) crc16(str, length) & MAX_CLUSTER_HSLOT;
-    return rv;
+/* If the key is "slot-" followed by a number do not use crc16.
+ * Instead assign the keys linearly to slots. */
+static inline uint16_t hash(const char *buf, size_t len) {
+    const uint32_t keys_per_slot = 346; // Need to adjust for configuration.
+    if ((len >= 5) && (buf[0] == 's') && (buf[1] == 'l') &&
+        (buf[2] == 'o') && (buf[3] == 't') && (buf[4] == '-')) {
+        uint32_t key = 0;
+        for (size_t counter = 5; counter < len; counter++) {
+            if ((buf[counter] >= '0') && (buf[counter] <= '9')) {
+                key = (key * 10) + (buf[counter] - '0');
+            }
+        }
+        return uint16_t(key / keys_per_slot);
+    } else {
+        return crc16(buf, len);
+    }
+}
+
+/* We have 16384 hash slots. The hash slot of a given key is obtained
+ * as the least significant 14 bits of the crc16 of the key.
+ *
+ * However if the key contains the {...} pattern, only the part between
+ * { and } is hashed. This may be useful in the future to force certain
+ * keys to be in the same node (assuming no resharding is in progress). */
+static uint32_t calc_hslot_crc16_cluster(const char *key, size_t keylen) {
+    size_t s, e; /* start-end indexes of { and } */
+
+    for (s = 0; s < keylen; s++)
+        if (key[s] == '{') break;
+
+    /* No '{' ? Hash the whole key. This is the base case. */
+    if (s == keylen) return hash(key,keylen) & MAX_CLUSTER_HSLOT;
+
+    /* '{' found? Check if we have the corresponding '}'. */
+    for (e = s+1; e < keylen; e++)
+        if (key[e] == '}') break;
+
+    /* No '}' or nothing between {} ? Hash the whole key. */
+    if (e == keylen || e == s+1) return hash(key,keylen) & MAX_CLUSTER_HSLOT;
+
+    /* If we are here there is both a { and a } on its right. Hash
+     * what is in the middle between { and }. */
+    return hash(key+s+1,e-s-1) & MAX_CLUSTER_HSLOT;
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////
