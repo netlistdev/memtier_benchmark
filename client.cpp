@@ -448,6 +448,7 @@ void client::handle_response(unsigned int conn_id, struct timeval timestamp,
                                   response->get_total_len(),
                                   request->m_size,
                                   ts_diff(request->m_sent_time, timestamp),
+                                  m_connections[conn_id]->get_readable_id(),
                                   response->get_hits(),
                                   request->m_keys - response->get_hits());
             break;
@@ -455,11 +456,13 @@ void client::handle_response(unsigned int conn_id, struct timeval timestamp,
             m_stats.update_set_op(&timestamp,
                                   response->get_total_len(),
                                   request->m_size,
-                                  ts_diff(request->m_sent_time, timestamp));
+                                  ts_diff(request->m_sent_time, timestamp),
+                                  m_connections[conn_id]->get_readable_id());
             break;
         case rt_wait:
             m_stats.update_wait_op(&timestamp,
-                                   ts_diff(request->m_sent_time, timestamp));
+                                   ts_diff(request->m_sent_time, timestamp),
+                                   m_connections[conn_id]->get_readable_id());
             break;
         case rt_arbitrary: {
             arbitrary_request *ar = static_cast<arbitrary_request *>(request);
@@ -467,6 +470,7 @@ void client::handle_response(unsigned int conn_id, struct timeval timestamp,
                                         response->get_total_len(),
                                         request->m_size,
                                         ts_diff(request->m_sent_time, timestamp),
+                                        m_connections[conn_id]->get_readable_id(),
                                         ar->index);
             break;
         }

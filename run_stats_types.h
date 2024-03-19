@@ -28,6 +28,11 @@
 #define LATENCY_HDR_RESULTS_MULTIPLIER 1000
 #define LATENCY_HDR_GRANULARITY 10
 
+#include <map>
+#include <string>
+typedef std::map<std::string,unsigned long int> id_ops;
+id_ops &operator+=(id_ops &a, const id_ops &b);
+
 #include "deps/hdr_histogram/hdr_histogram.h"
 #include "memtier_benchmark.h"
 
@@ -78,6 +83,7 @@ public:
     unsigned long int m_bytes_rx;
     unsigned long int m_bytes_tx;
     unsigned long int m_ops;
+    id_ops m_id_ops;
     unsigned int m_hits;
     unsigned int m_misses;
     unsigned int m_moved;
@@ -91,10 +97,10 @@ public:
     void reset();
     void merge(const one_sec_cmd_stats& other);
     void summarize_quantiles(safe_hdr_histogram histogram, std::vector<float> quantiles);
-    void update_op(unsigned int bytes_rx, unsigned int bytes_tx,  unsigned int latency);
-    void update_op(unsigned int bytes_rx, unsigned int bytes_tx,  unsigned int latency, unsigned int hits, unsigned int misses);
-    void update_moved_op(unsigned int bytes_rx, unsigned int bytes_tx,  unsigned int latency);
-    void update_ask_op(unsigned int bytes_rx, unsigned int bytes_tx,  unsigned int latency);
+    void update_op(unsigned int bytes_rx, unsigned int bytes_tx,  unsigned int latency, const char* readable_id);
+    void update_op(unsigned int bytes_rx, unsigned int bytes_tx,  unsigned int latency, const char* readable_id, unsigned int hits, unsigned int misses);
+    void update_moved_op(unsigned int bytes_rx, unsigned int bytes_tx,  unsigned int latency, const char* readable_id);
+    void update_ask_op(unsigned int bytes_rx, unsigned int bytes_tx,  unsigned int latency, const char* readable_id);
 };
 
 class one_second_stats; // forward declaration
@@ -142,6 +148,7 @@ public:
     double m_ask_sec;
     double m_latency;
     unsigned long int m_ops;
+    id_ops m_id_ops;
     totals_cmd();
     void add(const totals_cmd& other);
     void aggregate_average(size_t stats_size);
@@ -188,10 +195,11 @@ public:
     // number of bytes sent
     unsigned long int m_bytes_tx;
     unsigned long int m_ops;
+    id_ops m_id_ops;
     totals();
     void setup_arbitrary_commands(size_t n_arbitrary_commands);
     void add(const totals& other);
-    void update_op(unsigned long int bytes_rx, unsigned long int bytes_tx, unsigned int latency);
+    void update_op(unsigned long int bytes_rx, unsigned long int bytes_tx, unsigned int latency, const char* readable_id);
 };
 
 

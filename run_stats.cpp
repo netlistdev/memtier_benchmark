@@ -172,103 +172,103 @@ void run_stats::roll_cur_stats(struct timeval* ts)
     }
 }
 
-void run_stats::update_get_op(struct timeval* ts, unsigned int bytes_rx, unsigned int bytes_tx, unsigned int latency, unsigned int hits, unsigned int misses)
+void run_stats::update_get_op(struct timeval* ts, unsigned int bytes_rx, unsigned int bytes_tx, unsigned int latency, const char* readable_id, unsigned int hits, unsigned int misses)
 {
     roll_cur_stats(ts);
-    m_cur_stats.m_get_cmd.update_op(bytes_rx, bytes_tx, latency, hits, misses);
-    m_totals.update_op(bytes_rx, bytes_tx, latency);
+    m_cur_stats.m_get_cmd.update_op(bytes_rx, bytes_tx, latency, readable_id, hits, misses);
+    m_totals.update_op(bytes_rx, bytes_tx, latency, readable_id);
     hdr_record_value(m_get_latency_histogram,latency);
     hdr_record_value(inst_m_get_latency_histogram,latency);
 }
 
-void run_stats::update_set_op(struct timeval* ts, unsigned int bytes_rx, unsigned int bytes_tx, unsigned int latency)
+void run_stats::update_set_op(struct timeval* ts, unsigned int bytes_rx, unsigned int bytes_tx, unsigned int latency, const char* readable_id)
 {
     roll_cur_stats(ts);
 
-    m_cur_stats.m_set_cmd.update_op(bytes_rx, bytes_tx, latency);
-    m_totals.update_op(bytes_rx, bytes_tx, latency);
+    m_cur_stats.m_set_cmd.update_op(bytes_rx, bytes_tx, latency, readable_id);
+    m_totals.update_op(bytes_rx, bytes_tx, latency, readable_id);
     hdr_record_value(m_set_latency_histogram,latency);
     hdr_record_value(inst_m_set_latency_histogram,latency);
 }
 
-void run_stats::update_moved_get_op(struct timeval* ts, unsigned int bytes_rx, unsigned int bytes_tx, unsigned int latency)
+void run_stats::update_moved_get_op(struct timeval* ts, unsigned int bytes_rx, unsigned int bytes_tx, unsigned int latency, const char* readable_id)
 {
     roll_cur_stats(ts);
 
-    m_cur_stats.m_get_cmd.update_moved_op(bytes_rx, bytes_tx, latency);
-    m_totals.update_op(bytes_rx, bytes_tx, latency);
+    m_cur_stats.m_get_cmd.update_moved_op(bytes_rx, bytes_tx, latency, readable_id);
+    m_totals.update_op(bytes_rx, bytes_tx, latency, readable_id);
     hdr_record_value(m_get_latency_histogram,latency);
     hdr_record_value(inst_m_get_latency_histogram,latency);
 }
 
-void run_stats::update_moved_set_op(struct timeval* ts, unsigned int bytes_rx, unsigned int bytes_tx, unsigned int latency)
+void run_stats::update_moved_set_op(struct timeval* ts, unsigned int bytes_rx, unsigned int bytes_tx, unsigned int latency, const char* readable_id)
 {
     roll_cur_stats(ts);
 
-    m_cur_stats.m_set_cmd.update_moved_op(bytes_rx, bytes_tx, latency);
-    m_totals.update_op(bytes_rx, bytes_tx, latency);
+    m_cur_stats.m_set_cmd.update_moved_op(bytes_rx, bytes_tx, latency, readable_id);
+    m_totals.update_op(bytes_rx, bytes_tx, latency, readable_id);
     hdr_record_value(m_set_latency_histogram,latency);
     hdr_record_value(inst_m_set_latency_histogram,latency);
 }
 
 void run_stats::update_moved_arbitrary_op(struct timeval *ts, unsigned int bytes_rx, unsigned int bytes_tx,
-                                    unsigned int latency, size_t request_index) {
+                                    unsigned int latency, const char* readable_id, size_t request_index) {
     roll_cur_stats(ts);
 
-    m_cur_stats.m_ar_commands.at(request_index).update_moved_op(bytes_rx, bytes_tx, latency);
-    m_totals.update_op(bytes_rx, bytes_tx, latency);
+    m_cur_stats.m_ar_commands.at(request_index).update_moved_op(bytes_rx, bytes_tx, latency, readable_id);
+    m_totals.update_op(bytes_rx, bytes_tx, latency, readable_id);
 
     struct hdr_histogram* hist = m_ar_commands_latency_histograms.at(request_index);
     hdr_record_value(hist,latency);
 }
 
-void run_stats::update_ask_get_op(struct timeval* ts, unsigned int bytes_rx, unsigned int bytes_tx, unsigned int latency)
+void run_stats::update_ask_get_op(struct timeval* ts, unsigned int bytes_rx, unsigned int bytes_tx, unsigned int latency, const char* readable_id)
 {
     roll_cur_stats(ts);
 
-    m_cur_stats.m_get_cmd.update_ask_op(bytes_rx, bytes_tx, latency);
-    m_totals.update_op(bytes_rx, bytes_tx, latency);
+    m_cur_stats.m_get_cmd.update_ask_op(bytes_rx, bytes_tx, latency, readable_id);
+    m_totals.update_op(bytes_rx, bytes_tx, latency, readable_id);
     hdr_record_value(m_get_latency_histogram,latency);
     hdr_record_value(inst_m_get_latency_histogram,latency);
 }
 
-void run_stats::update_ask_set_op(struct timeval* ts, unsigned int bytes_rx, unsigned int bytes_tx, unsigned int latency)
+void run_stats::update_ask_set_op(struct timeval* ts, unsigned int bytes_rx, unsigned int bytes_tx, unsigned int latency, const char* readable_id)
 {
     roll_cur_stats(ts);
 
-    m_cur_stats.m_set_cmd.update_ask_op(bytes_rx, bytes_tx, latency);
-    m_totals.update_op(bytes_rx, bytes_tx, latency);
+    m_cur_stats.m_set_cmd.update_ask_op(bytes_rx, bytes_tx, latency, readable_id);
+    m_totals.update_op(bytes_rx, bytes_tx, latency, readable_id);
     hdr_record_value(m_set_latency_histogram,latency);
     hdr_record_value(inst_m_set_latency_histogram,latency);
 }
 
 void run_stats::update_ask_arbitrary_op(struct timeval *ts, unsigned int bytes_rx, unsigned int bytes_tx,
-                                          unsigned int latency, size_t request_index) {
+                                          unsigned int latency, const char* readable_id, size_t request_index) {
     roll_cur_stats(ts);
 
-    m_cur_stats.m_ar_commands.at(request_index).update_ask_op(bytes_rx, bytes_tx, latency);
-    m_totals.update_op(bytes_rx, bytes_tx, latency);
+    m_cur_stats.m_ar_commands.at(request_index).update_ask_op(bytes_rx, bytes_tx, latency, readable_id);
+    m_totals.update_op(bytes_rx, bytes_tx, latency, readable_id);
 
     struct hdr_histogram* hist = m_ar_commands_latency_histograms.at(request_index);
     hdr_record_value(hist,latency);
 }
 
-void run_stats::update_wait_op(struct timeval *ts, unsigned int latency)
+void run_stats::update_wait_op(struct timeval *ts, unsigned int latency, const char* readable_id)
 {
     roll_cur_stats(ts);
 
-    m_cur_stats.m_wait_cmd.update_op(0,0, latency);
-    m_totals.update_op(0,0, latency);
+    m_cur_stats.m_wait_cmd.update_op(0,0, latency, readable_id);
+    m_totals.update_op(0,0, latency, readable_id);
     hdr_record_value(m_wait_latency_histogram,latency);
     hdr_record_value(inst_m_wait_latency_histogram,latency);
 }
 
 void run_stats::update_arbitrary_op(struct timeval *ts, unsigned int bytes_rx, unsigned int bytes_tx,
-                                    unsigned int latency, size_t request_index) {
+                                    unsigned int latency, const char* readable_id, size_t request_index) {
     roll_cur_stats(ts);
 
-    m_cur_stats.m_ar_commands.at(request_index).update_op(bytes_rx, bytes_tx, latency);
-    m_totals.update_op(bytes_rx, bytes_tx, latency);
+    m_cur_stats.m_ar_commands.at(request_index).update_op(bytes_rx, bytes_tx, latency, readable_id);
+    m_totals.update_op(bytes_rx, bytes_tx, latency, readable_id);
 
     struct hdr_histogram* hist = m_ar_commands_latency_histograms.at(request_index);
     struct hdr_histogram* inst_hist = inst_m_ar_commands_latency_histograms.at(request_index);
@@ -815,6 +815,9 @@ void run_stats::summarize(totals& result) const
 
     // total ops, bytes
     result.m_ops = totals.m_set_cmd.m_ops + totals.m_get_cmd.m_ops + totals.m_wait_cmd.m_ops + totals.m_ar_commands.ops();
+    result.m_id_ops += totals.m_set_cmd.m_id_ops;
+    result.m_id_ops += totals.m_get_cmd.m_id_ops;
+    result.m_id_ops += totals.m_wait_cmd.m_id_ops;
     result.m_bytes_rx = totals.m_set_cmd.m_bytes_rx + totals.m_get_cmd.m_bytes_rx + totals.m_ar_commands.bytes();
     result.m_bytes_tx = totals.m_set_cmd.m_bytes_tx + totals.m_get_cmd.m_bytes_tx + totals.m_ar_commands.bytes();
 
@@ -905,6 +908,9 @@ void result_print_to_json(json_handler * jsonhandler, const char * type, double 
                         jsonhandler->write_obj((char *)quantile_header,"%.3f", value);
                     }
                 }
+            }
+            for (const auto& id_op : cmd_stats.m_id_ops) {
+                jsonhandler->write_obj(id_op.first.c_str(),"%lld", id_op.second);
             }
             jsonhandler->close_nesting();
         }

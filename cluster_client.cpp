@@ -472,18 +472,21 @@ void cluster_client::handle_moved(unsigned int conn_id, struct timeval timestamp
         m_stats.update_moved_get_op(&timestamp,
                                     response->get_total_len(),
                                     request->m_size,
-                                    ts_diff(request->m_sent_time, timestamp));
+                                    ts_diff(request->m_sent_time, timestamp),
+                                    m_connections[conn_id]->get_readable_id());
     } else if (request->m_type == rt_set) {
         m_stats.update_moved_set_op(&timestamp,
                                     response->get_total_len(),
                                     request->m_size,
-                                    ts_diff(request->m_sent_time, timestamp));
+                                    ts_diff(request->m_sent_time, timestamp),
+                                    m_connections[conn_id]->get_readable_id());
      } else if (request->m_type == rt_arbitrary) {
         arbitrary_request *ar = static_cast<arbitrary_request *>(request);
         m_stats.update_moved_arbitrary_op(&timestamp,
                                     response->get_total_len(),
                                     request->m_size,
                                     ts_diff(request->m_sent_time, timestamp),
+                                    m_connections[conn_id]->get_readable_id(),
                                     ar->index);
     } else {
         assert(0);
@@ -509,18 +512,21 @@ void cluster_client::handle_ask(unsigned int conn_id, struct timeval timestamp,
         m_stats.update_ask_get_op(&timestamp,
                                     response->get_total_len(),
                                     request->m_size,
-                                    ts_diff(request->m_sent_time, timestamp));
+                                    ts_diff(request->m_sent_time, timestamp),
+                                    m_connections[conn_id]->get_readable_id());
     } else if (request->m_type == rt_set) {
         m_stats.update_ask_set_op(&timestamp,
                                     response->get_total_len(),
                                     request->m_size,
-                                    ts_diff(request->m_sent_time, timestamp));
+                                    ts_diff(request->m_sent_time, timestamp),
+                                    m_connections[conn_id]->get_readable_id());
     } else if (request->m_type == rt_arbitrary) {
         arbitrary_request *ar = static_cast<arbitrary_request *>(request);
         m_stats.update_ask_arbitrary_op(&timestamp,
                                     response->get_total_len(),
                                     request->m_size,
                                     ts_diff(request->m_sent_time, timestamp),
+                                    m_connections[conn_id]->get_readable_id(),
                                     ar->index);
     } else {
         assert(0);

@@ -25,6 +25,13 @@
 #include "run_stats_types.h"
 
 
+id_ops &operator+=(id_ops &a, const id_ops &b) {
+    for (const auto& id_op : b) {
+        a[id_op.first] += id_op.second;
+    }
+    return a;
+}
+
 
 one_sec_cmd_stats::one_sec_cmd_stats() :
     m_bytes_rx(0),
@@ -45,6 +52,7 @@ void one_sec_cmd_stats::reset() {
     m_bytes_rx = 0;
     m_bytes_tx = 0;
     m_ops = 0;
+    m_id_ops.clear();
     m_hits = 0;
     m_misses = 0;
     m_moved = 0;
@@ -60,6 +68,7 @@ void one_sec_cmd_stats::merge(const one_sec_cmd_stats& other) {
     m_bytes_rx += other.m_bytes_rx;
     m_bytes_tx += other.m_bytes_tx;
     m_ops += other.m_ops;
+    m_id_ops += other.m_id_ops;
     m_hits += other.m_hits;
     m_misses += other.m_misses;
     m_moved += other.m_moved;
@@ -82,27 +91,31 @@ void one_sec_cmd_stats::summarize_quantiles(safe_hdr_histogram histogram, std::v
     m_min_latency = has_samples ? hdr_min(histogram)/ (double) LATENCY_HDR_RESULTS_MULTIPLIER : 0.0;
 }
 
-void one_sec_cmd_stats::update_op(unsigned int bytes_rx, unsigned int bytes_tx, unsigned int latency) {
+void one_sec_cmd_stats::update_op(unsigned int bytes_rx, unsigned int bytes_tx, unsigned int latency,
+                                  const char* readable_id) {
     m_bytes_rx += bytes_rx;
     m_bytes_tx += bytes_tx;
     m_ops++;
+    m_id_ops[readable_id]++;
     m_total_latency += latency;
 }
 
 void one_sec_cmd_stats::update_op(unsigned int bytes_rx, unsigned int bytes_tx, unsigned int latency,
-                                  unsigned int hits, unsigned int misses) {
-    update_op(bytes_rx, bytes_tx, latency);
+                                  const char* readable_id, unsigned int hits, unsigned int misses) {
+    update_op(bytes_rx, bytes_tx, latency, readable_id);
     m_hits += hits;
     m_misses += misses;
 }
 
-void one_sec_cmd_stats::update_moved_op(unsigned int bytes_rx, unsigned int bytes_tx, unsigned int latency) {
-    update_op(bytes_rx, bytes_tx, latency);
+void one_sec_cmd_stats::update_moved_op(unsigned int bytes_rx, unsigned int bytes_tx, unsigned int latency,
+                                  const char* readable_id) {
+    update_op(bytes_rx, bytes_tx, latency, readable_id);
     m_moved++;
 }
 
-void one_sec_cmd_stats::update_ask_op(unsigned int bytes_rx, unsigned int bytes_tx, unsigned int latency) {
-    update_op(bytes_rx, bytes_tx, latency);
+void one_sec_cmd_stats::update_ask_op(unsigned int bytes_rx, unsigned int bytes_tx, unsigned int latency,
+                                  const char* readable_id) {
+    update_op(bytes_rx, bytes_tx, latency, readable_id);
     m_ask++;
 }
 
@@ -209,6 +222,7 @@ void totals_cmd::add(const totals_cmd& other) {
     m_bytes_sec_tx += other.m_bytes_sec_tx;
     m_latency += other.m_latency;
     m_ops += other.m_ops;
+    m_id_ops += other.m_id_ops;
 }
 
 void totals_cmd::aggregate_average(size_t stats_size) {
@@ -223,6 +237,7 @@ void totals_cmd::aggregate_average(size_t stats_size) {
 
 void totals_cmd::summarize(const one_sec_cmd_stats& other, unsigned long test_duration_usec) {
     m_ops = other.m_ops;
+    m_id_ops += other.m_id_ops;
 
     m_ops_sec = (double) other.m_ops / test_duration_usec * 1000000;
     if (other.m_ops > 0) {
@@ -302,15 +317,17 @@ void totals::add(const totals& other) {
     m_bytes_tx += other.m_bytes_tx;
     m_latency += other.m_latency;
     m_ops += other.m_ops;
+    m_id_ops += other.m_id_ops;
 
     // aggregate latency data
     hdr_add(latency_histogram,other.latency_histogram);
 }
 
-void totals::update_op(unsigned long int bytes_rx, unsigned long int bytes_tx, unsigned int latency) {
+void totals::update_op(unsigned long int bytes_rx, unsigned long int bytes_tx, unsigned int latency, const char* readable_id) {
     m_bytes_rx += bytes_rx;
     m_bytes_tx += bytes_tx;
     m_ops++;
+    m_id_ops[readable_id]++;
     m_latency += latency;
     hdr_record_value(latency_histogram,latency);
 }
