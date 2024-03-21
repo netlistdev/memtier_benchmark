@@ -815,7 +815,7 @@ void run_stats::summarize(totals& result) const
 
     // total ops, bytes
     result.m_ops = totals.m_set_cmd.m_ops + totals.m_get_cmd.m_ops + totals.m_wait_cmd.m_ops + totals.m_ar_commands.ops();
-    result.m_id_ops += totals.m_set_cmd.m_id_ops;
+    result.m_id_ops = totals.m_set_cmd.m_id_ops;
     result.m_id_ops += totals.m_get_cmd.m_id_ops;
     result.m_id_ops += totals.m_wait_cmd.m_id_ops;
     result.m_bytes_rx = totals.m_set_cmd.m_bytes_rx + totals.m_get_cmd.m_bytes_rx + totals.m_ar_commands.bytes();
@@ -851,7 +851,7 @@ void run_stats::summarize(totals& result) const
     result.m_ask_sec = (double) (totals.m_set_cmd.m_ask + totals.m_get_cmd.m_ask) / test_duration_usec * 1000000;
 }
 
-void result_print_to_json(json_handler * jsonhandler, const char * type, double ops,
+void result_print_to_json(json_handler * jsonhandler, const char * type, double ops, id_ops &id_ops,
                           double hits, double miss, double moved, double ask, double kbs, double kbs_rx, double kbs_tx,
                           std::vector<float> quantile_list, struct hdr_histogram* latency_histogram, 
                           std::vector<unsigned int> timestamps, 
@@ -884,6 +884,9 @@ void result_print_to_json(json_handler * jsonhandler, const char * type, double 
         jsonhandler->write_obj("KB/sec RX/TX","%.2f", kbs);
         jsonhandler->write_obj("KB/sec RX","%.2f", kbs_rx);
         jsonhandler->write_obj("KB/sec TX","%.2f", kbs_tx);
+        for (const auto& id_op : id_ops) {
+            jsonhandler->write_obj(id_op.first.c_str(),"%lld", id_op.second);
+        }
         jsonhandler->open_nesting("Time-Serie");
         for (std::size_t i = 0; i < timeserie_stats.size(); i++){
             char timestamp_str[16];
@@ -1208,6 +1211,7 @@ void run_stats::print_json(json_handler *jsonhandler, arbitrary_command_list& co
             std::vector<one_sec_cmd_stats> arbitrary_command_stats = get_one_sec_cmd_stats_arbitrary_command(i);
 
             result_print_to_json(jsonhandler, command_name.c_str(), m_totals.m_ar_commands[i].m_ops_sec,
+                                 m_totals.m_ar_commands[i].m_id_ops,
                                  0.0,
                                  0.0,
                                  cluster_mode ? m_totals.m_ar_commands[i].m_moved_sec : -1,
@@ -1226,6 +1230,7 @@ void run_stats::print_json(json_handler *jsonhandler, arbitrary_command_list& co
         std::vector<one_sec_cmd_stats> set_stats = get_one_sec_cmd_stats_set();
         std::vector<one_sec_cmd_stats> wait_stats = get_one_sec_cmd_stats_wait();
         result_print_to_json(jsonhandler, "Sets",m_totals.m_set_cmd.m_ops_sec,
+                             m_totals.m_set_cmd.m_id_ops,
                              0.0,
                              0.0,
                              cluster_mode ? m_totals.m_set_cmd.m_moved_sec : -1,
@@ -1239,6 +1244,7 @@ void run_stats::print_json(json_handler *jsonhandler, arbitrary_command_list& co
                              set_stats
                             );
         result_print_to_json(jsonhandler,"Gets",m_totals.m_get_cmd.m_ops_sec,
+                             m_totals.m_get_cmd.m_id_ops,
                              m_totals.m_hits_sec,
                              m_totals.m_misses_sec,
                              cluster_mode ? m_totals.m_get_cmd.m_moved_sec : -1,
@@ -1252,6 +1258,7 @@ void run_stats::print_json(json_handler *jsonhandler, arbitrary_command_list& co
                              get_stats
                              );
         result_print_to_json(jsonhandler,"Waits",m_totals.m_wait_cmd.m_ops_sec,
+                             m_totals.m_wait_cmd.m_id_ops,
                              0.0,
                              0.0,
                              cluster_mode ? 0.0 : -1,
@@ -1267,6 +1274,7 @@ void run_stats::print_json(json_handler *jsonhandler, arbitrary_command_list& co
     }
     std::vector<one_sec_cmd_stats> total_stats = get_one_sec_cmd_stats_totals();
     result_print_to_json(jsonhandler,"Totals",m_totals.m_ops_sec,
+                         m_totals.m_id_ops,
                          m_totals.m_hits_sec,
                          m_totals.m_misses_sec,
                          cluster_mode ? m_totals.m_moved_sec : -1,
