@@ -25,14 +25,6 @@
 #include "run_stats_types.h"
 
 
-id_ops &operator+=(id_ops &a, const id_ops &b) {
-    for (const auto& id_op : b) {
-        a[id_op.first] += id_op.second;
-    }
-    return a;
-}
-
-
 one_sec_cmd_stats::one_sec_cmd_stats() :
     m_bytes_rx(0),
     m_bytes_tx(0),
@@ -52,7 +44,6 @@ void one_sec_cmd_stats::reset() {
     m_bytes_rx = 0;
     m_bytes_tx = 0;
     m_ops = 0;
-    m_id_ops.clear();
     m_hits = 0;
     m_misses = 0;
     m_moved = 0;
@@ -62,13 +53,13 @@ void one_sec_cmd_stats::reset() {
     m_max_latency = 0;
     m_min_latency = 0;
     summarized_quantile_values.clear();
+    m_nodes.clear();
 }
 
 void one_sec_cmd_stats::merge(const one_sec_cmd_stats& other) {
     m_bytes_rx += other.m_bytes_rx;
     m_bytes_tx += other.m_bytes_tx;
     m_ops += other.m_ops;
-    m_id_ops += other.m_id_ops;
     m_hits += other.m_hits;
     m_misses += other.m_misses;
     m_moved += other.m_moved;
@@ -77,6 +68,7 @@ void one_sec_cmd_stats::merge(const one_sec_cmd_stats& other) {
     m_avg_latency = (double) m_total_latency / (double) m_ops / (double) LATENCY_HDR_RESULTS_MULTIPLIER;
     m_max_latency = other.m_max_latency > m_max_latency ? other.m_max_latency : m_max_latency;
     m_min_latency = other.m_min_latency < m_min_latency ? other.m_min_latency : m_min_latency;
+    m_nodes += other.m_nodes;
 }
 
 void one_sec_cmd_stats::summarize_quantiles(safe_hdr_histogram histogram, std::vector<float> quantiles) {
@@ -96,8 +88,10 @@ void one_sec_cmd_stats::update_op(unsigned int bytes_rx, unsigned int bytes_tx, 
     m_bytes_rx += bytes_rx;
     m_bytes_tx += bytes_tx;
     m_ops++;
-    m_id_ops[readable_id]++;
     m_total_latency += latency;
+    if (readable_id) {
+        m_nodes[readable_id].update_op(bytes_rx, bytes_tx, latency, 0);
+    }
 }
 
 void one_sec_cmd_stats::update_op(unsigned int bytes_rx, unsigned int bytes_tx, unsigned int latency,
@@ -118,6 +112,14 @@ void one_sec_cmd_stats::update_ask_op(unsigned int bytes_rx, unsigned int bytes_
     update_op(bytes_rx, bytes_tx, latency, readable_id);
     m_ask++;
 }
+
+node_stats &operator+=(node_stats &a, const node_stats &b) {
+    for (const auto& node : b) {
+        a[node.first].merge(node.second);
+    }
+    return a;
+}
+
 
 void ar_one_sec_cmd_stats::setup(size_t n_arbitrary_commands) {
     m_commands.resize(n_arbitrary_commands);
@@ -222,7 +224,7 @@ void totals_cmd::add(const totals_cmd& other) {
     m_bytes_sec_tx += other.m_bytes_sec_tx;
     m_latency += other.m_latency;
     m_ops += other.m_ops;
-    m_id_ops += other.m_id_ops;
+    m_nodes += other.m_nodes;
 }
 
 void totals_cmd::aggregate_average(size_t stats_size) {
@@ -237,7 +239,6 @@ void totals_cmd::aggregate_average(size_t stats_size) {
 
 void totals_cmd::summarize(const one_sec_cmd_stats& other, unsigned long test_duration_usec) {
     m_ops = other.m_ops;
-    m_id_ops += other.m_id_ops;
 
     m_ops_sec = (double) other.m_ops / test_duration_usec * 1000000;
     if (other.m_ops > 0) {
@@ -250,6 +251,7 @@ void totals_cmd::summarize(const one_sec_cmd_stats& other, unsigned long test_du
     m_bytes_sec_tx = (other.m_bytes_tx / 1024.0) / test_duration_usec * 1000000;
     m_moved_sec = (double) other.m_moved / test_duration_usec * 1000000;
     m_ask_sec = (double) other.m_ask / test_duration_usec * 1000000;
+    m_nodes += other.m_nodes;
 }
 
 void ar_totals_cmd::setup(size_t n_arbitrary_commands) {
@@ -317,7 +319,7 @@ void totals::add(const totals& other) {
     m_bytes_tx += other.m_bytes_tx;
     m_latency += other.m_latency;
     m_ops += other.m_ops;
-    m_id_ops += other.m_id_ops;
+    m_nodes += other.m_nodes;
 
     // aggregate latency data
     hdr_add(latency_histogram,other.latency_histogram);
@@ -325,9 +327,12 @@ void totals::add(const totals& other) {
 
 void totals::update_op(unsigned long int bytes_rx, unsigned long int bytes_tx, unsigned int latency, const char* readable_id) {
     m_bytes_rx += bytes_rx;
+    m_nodes[readable_id].m_bytes_rx += m_bytes_rx;
     m_bytes_tx += bytes_tx;
+    m_nodes[readable_id].m_bytes_tx += m_bytes_tx;
     m_ops++;
-    m_id_ops[readable_id]++;
+    m_nodes[readable_id].m_ops++;
     m_latency += latency;
+    m_nodes[readable_id].m_total_latency += latency;
     hdr_record_value(latency_histogram,latency);
 }

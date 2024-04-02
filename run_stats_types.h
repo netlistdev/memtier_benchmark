@@ -30,8 +30,6 @@
 
 #include <map>
 #include <string>
-typedef std::map<std::string,unsigned long int> id_ops;
-id_ops &operator+=(id_ops &a, const id_ops &b);
 
 #include "deps/hdr_histogram/hdr_histogram.h"
 #include "memtier_benchmark.h"
@@ -78,12 +76,15 @@ public:
     operator hdr_histogram* () const { return m_hdr; }
 };
 
+class one_sec_cmd_stats; // forward declaration
+typedef std::map<std::string, one_sec_cmd_stats> node_stats;
+node_stats &operator+=(node_stats &a, const node_stats &b);
+
 class one_sec_cmd_stats {
 public:
     unsigned long int m_bytes_rx;
     unsigned long int m_bytes_tx;
     unsigned long int m_ops;
-    id_ops m_id_ops;
     unsigned int m_hits;
     unsigned int m_misses;
     unsigned int m_moved;
@@ -93,6 +94,7 @@ public:
     double m_avg_latency;
     double m_min_latency;
     double m_max_latency;
+    node_stats m_nodes;
     one_sec_cmd_stats();
     void reset();
     void merge(const one_sec_cmd_stats& other);
@@ -148,7 +150,7 @@ public:
     double m_ask_sec;
     double m_latency;
     unsigned long int m_ops;
-    id_ops m_id_ops;
+    node_stats m_nodes;
     totals_cmd();
     void add(const totals_cmd& other);
     void aggregate_average(size_t stats_size);
@@ -195,7 +197,7 @@ public:
     // number of bytes sent
     unsigned long int m_bytes_tx;
     unsigned long int m_ops;
-    id_ops m_id_ops;
+    node_stats m_nodes;
     totals();
     void setup_arbitrary_commands(size_t n_arbitrary_commands);
     void add(const totals& other);

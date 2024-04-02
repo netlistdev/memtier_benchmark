@@ -815,9 +815,12 @@ void run_stats::summarize(totals& result) const
 
     // total ops, bytes
     result.m_ops = totals.m_set_cmd.m_ops + totals.m_get_cmd.m_ops + totals.m_wait_cmd.m_ops + totals.m_ar_commands.ops();
-    result.m_id_ops = totals.m_set_cmd.m_id_ops;
-    result.m_id_ops += totals.m_get_cmd.m_id_ops;
-    result.m_id_ops += totals.m_wait_cmd.m_id_ops;
+    result.m_nodes = totals.m_set_cmd.m_nodes;
+    result.m_nodes += totals.m_get_cmd.m_nodes;
+    result.m_nodes += totals.m_wait_cmd.m_nodes;
+    for (std::size_t idx = 0; idx < totals.m_ar_commands.size(); ++idx) {
+        result.m_nodes += totals.m_ar_commands[idx].m_nodes;
+    }
     result.m_bytes_rx = totals.m_set_cmd.m_bytes_rx + totals.m_get_cmd.m_bytes_rx + totals.m_ar_commands.bytes();
     result.m_bytes_tx = totals.m_set_cmd.m_bytes_tx + totals.m_get_cmd.m_bytes_tx + totals.m_ar_commands.bytes();
 
@@ -851,7 +854,34 @@ void run_stats::summarize(totals& result) const
     result.m_ask_sec = (double) (totals.m_set_cmd.m_ask + totals.m_get_cmd.m_ask) / test_duration_usec * 1000000;
 }
 
-void result_print_to_json(json_handler * jsonhandler, const char * type, double ops, id_ops &id_ops,
+void cmd_stats_print_to_json(json_handler * jsonhandler, std::vector<float> &quantile_list,
+                             const one_sec_cmd_stats &cmd_stats, const std::string header)
+{
+    jsonhandler->write_obj((header+"Bytes RX").c_str(),"%lld", cmd_stats.m_bytes_rx);
+    jsonhandler->write_obj((header+"Bytes TX").c_str(),"%lld", cmd_stats.m_bytes_tx);
+    jsonhandler->write_obj((header+"Count").c_str(),"%lld", cmd_stats.m_ops);
+    if (cmd_stats.m_ops > 0) {
+        jsonhandler->write_obj((header+"Average Latency").c_str(),"%.3f", cmd_stats.m_avg_latency);
+        if (header == "") {
+            jsonhandler->write_obj((header+"Min Latency").c_str(),"%.3f", cmd_stats.m_min_latency);
+            jsonhandler->write_obj((header+"Max Latency").c_str(),"%.3f", cmd_stats.m_max_latency);
+            for (std::size_t i = 0; i < quantile_list.size(); i++){
+                if (i < cmd_stats.summarized_quantile_values.size()){
+                    const float quantile = quantile_list[i];
+                    char quantile_header[8];
+                    snprintf(quantile_header,sizeof(quantile_header)-1,"p%.2f", quantile);
+                    const double value = cmd_stats.summarized_quantile_values[i];
+                    jsonhandler->write_obj((header+(char *)quantile_header).c_str(),"%.3f", value);
+                }
+            }
+        }
+    }
+    for (const auto& node : cmd_stats.m_nodes) {
+        cmd_stats_print_to_json(jsonhandler, quantile_list, node.second, node.first + " ");
+    }
+}
+
+void result_print_to_json(json_handler * jsonhandler, const char * type, double ops, node_stats &nodes,
                           double hits, double miss, double moved, double ask, double kbs, double kbs_rx, double kbs_tx,
                           std::vector<float> quantile_list, struct hdr_histogram* latency_histogram, 
                           std::vector<unsigned int> timestamps, 
@@ -875,7 +905,7 @@ void result_print_to_json(json_handler * jsonhandler, const char * type, double 
         const double min_latency = has_samples ? hdr_min(latency_histogram)/ (double) LATENCY_HDR_RESULTS_MULTIPLIER : 0.0;
         const double max_latency = has_samples ? hdr_max(latency_histogram)/ (double) LATENCY_HDR_RESULTS_MULTIPLIER : 0.0;
         // to be retrocompatible
-        jsonhandler->write_obj("Latency","%.3f", avg_latency);
+        // jsonhandler->write_obj("Latency","%.3f", avg_latency);
         jsonhandler->write_obj("Average Latency","%.3f", avg_latency);
         jsonhandler->write_obj("Min Latency","%.3f", min_latency);
         jsonhandler->write_obj("Max Latency","%.3f", max_latency);
@@ -884,37 +914,17 @@ void result_print_to_json(json_handler * jsonhandler, const char * type, double 
         jsonhandler->write_obj("KB/sec RX/TX","%.2f", kbs);
         jsonhandler->write_obj("KB/sec RX","%.2f", kbs_rx);
         jsonhandler->write_obj("KB/sec TX","%.2f", kbs_tx);
-        for (const auto& id_op : id_ops) {
-            jsonhandler->write_obj(id_op.first.c_str(),"%lld", id_op.second);
+        for (const auto& node : nodes) {
+            cmd_stats_print_to_json(jsonhandler, quantile_list, node.second, (node.first+" ").c_str());
         }
         jsonhandler->open_nesting("Time-Serie");
         for (std::size_t i = 0; i < timeserie_stats.size(); i++){
             char timestamp_str[16];
             one_sec_cmd_stats cmd_stats = timeserie_stats[i];
             const unsigned int timestamp = timestamps[i];
-            const bool sec_has_samples = cmd_stats.m_ops > 0;
             snprintf(timestamp_str,sizeof(timestamp_str)-1,"%d", timestamp);
             jsonhandler->open_nesting(timestamp_str);
-            jsonhandler->write_obj("Bytes RX","%lld", cmd_stats.m_bytes_rx);
-            jsonhandler->write_obj("Bytes TX","%lld", cmd_stats.m_bytes_tx);
-            jsonhandler->write_obj("Count","%lld", cmd_stats.m_ops);
-            if (sec_has_samples){
-                jsonhandler->write_obj("Average Latency","%.3f", cmd_stats.m_avg_latency);
-                jsonhandler->write_obj("Min Latency","%.3f", cmd_stats.m_min_latency);
-                jsonhandler->write_obj("Max Latency","%.3f", cmd_stats.m_max_latency);
-                for (std::size_t i = 0; i < quantile_list.size(); i++){
-                    if (i < cmd_stats.summarized_quantile_values.size()){
-                        const float quantile = quantile_list[i];
-                        char quantile_header[8];
-                        snprintf(quantile_header,sizeof(quantile_header)-1,"p%.2f", quantile);
-                        const double value = cmd_stats.summarized_quantile_values[i];
-                        jsonhandler->write_obj((char *)quantile_header,"%.3f", value);
-                    }
-                }
-            }
-            for (const auto& id_op : cmd_stats.m_id_ops) {
-                jsonhandler->write_obj(id_op.first.c_str(),"%lld", id_op.second);
-            }
+            cmd_stats_print_to_json(jsonhandler, quantile_list, cmd_stats, "");
             jsonhandler->close_nesting();
         }
         jsonhandler->close_nesting();
@@ -1211,7 +1221,7 @@ void run_stats::print_json(json_handler *jsonhandler, arbitrary_command_list& co
             std::vector<one_sec_cmd_stats> arbitrary_command_stats = get_one_sec_cmd_stats_arbitrary_command(i);
 
             result_print_to_json(jsonhandler, command_name.c_str(), m_totals.m_ar_commands[i].m_ops_sec,
-                                 m_totals.m_ar_commands[i].m_id_ops,
+                                 m_totals.m_ar_commands[i].m_nodes,
                                  0.0,
                                  0.0,
                                  cluster_mode ? m_totals.m_ar_commands[i].m_moved_sec : -1,
@@ -1230,7 +1240,7 @@ void run_stats::print_json(json_handler *jsonhandler, arbitrary_command_list& co
         std::vector<one_sec_cmd_stats> set_stats = get_one_sec_cmd_stats_set();
         std::vector<one_sec_cmd_stats> wait_stats = get_one_sec_cmd_stats_wait();
         result_print_to_json(jsonhandler, "Sets",m_totals.m_set_cmd.m_ops_sec,
-                             m_totals.m_set_cmd.m_id_ops,
+                             m_totals.m_set_cmd.m_nodes,
                              0.0,
                              0.0,
                              cluster_mode ? m_totals.m_set_cmd.m_moved_sec : -1,
@@ -1244,7 +1254,7 @@ void run_stats::print_json(json_handler *jsonhandler, arbitrary_command_list& co
                              set_stats
                             );
         result_print_to_json(jsonhandler,"Gets",m_totals.m_get_cmd.m_ops_sec,
-                             m_totals.m_get_cmd.m_id_ops,
+                             m_totals.m_get_cmd.m_nodes,
                              m_totals.m_hits_sec,
                              m_totals.m_misses_sec,
                              cluster_mode ? m_totals.m_get_cmd.m_moved_sec : -1,
@@ -1258,7 +1268,7 @@ void run_stats::print_json(json_handler *jsonhandler, arbitrary_command_list& co
                              get_stats
                              );
         result_print_to_json(jsonhandler,"Waits",m_totals.m_wait_cmd.m_ops_sec,
-                             m_totals.m_wait_cmd.m_id_ops,
+                             m_totals.m_wait_cmd.m_nodes,
                              0.0,
                              0.0,
                              cluster_mode ? 0.0 : -1,
@@ -1274,7 +1284,7 @@ void run_stats::print_json(json_handler *jsonhandler, arbitrary_command_list& co
     }
     std::vector<one_sec_cmd_stats> total_stats = get_one_sec_cmd_stats_totals();
     result_print_to_json(jsonhandler,"Totals",m_totals.m_ops_sec,
-                         m_totals.m_id_ops,
+                         m_totals.m_nodes,
                          m_totals.m_hits_sec,
                          m_totals.m_misses_sec,
                          cluster_mode ? m_totals.m_moved_sec : -1,
